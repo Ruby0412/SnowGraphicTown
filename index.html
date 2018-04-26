@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="UTF-8">
+    <title>Snow World</title>
+</head>
+<body>
+<script src="Libraries/twgl-full.js"></script>
+<script src="Libraries/panel.js"></script>
+<script src="Libraries/arcball.js"></script>
+<script src="ball.js"></script>
+
+<script src="ExampleObjects/skybox.js"></script>
+
+<script src="ExampleObjects/ground.js"></script>
+
+<script src="ExampleObjects/human.js"></script>
+<script src="ExampleObjects/firework.js"></script>
+   
+<script src="ExampleObjects/textureplane.js"></script>
+<script src="ExampleObjects/textureplane2.js"></script>
+<script src="ExampleObjects/textureplane3.js"></script>
+<script src="ExampleObjects/refbox.js"></script>
+<script src="main.js"></script>
+
+<script id="cube-vs" type="notjs">
+// specialized shader for the simple cube
+// we assume that the model matrix works as the normal
+//      matrix - this only is try if the model matrix
+//      it a rotate/translate
+//      (uniform scale is OK since we re-normalize)
+// color is solid
+// simple lighting
+    precision highp float;
+
+    attribute vec3 vpos;
+    attribute vec3 vnormal;
+    varying vec3 outColor;
+
+    uniform mat4 view;
+    uniform mat4 proj;
+    uniform mat4 model;
+    uniform vec3 lightdir;
+    uniform vec3 cubecolor;
+
+
+    void main(void) {
+        gl_Position = proj * view * model * vec4(vpos, 1.0);
+        vec4 normal = normalize(model * vec4(vnormal,0.0));
+        float diffuse = .2 + .8*max(dot(normal, vec4(lightdir,0.0)),0.);
+        outColor = cubecolor * diffuse;
+    }
+</script>
+<script id="cube-fs" type="notjs">
+// simple shader that does vertex coloring
+//  (e.g. the vertex shader figures the lighting
+// note this is used for more than just the cube
+    precision highp float;
+    varying vec3 outColor;
+    void main(void) {
+        gl_FragColor = vec4(outColor, 1.0);
+    }
+</script>
+
+<!-- Special Ground Plane Shader - makes a boring
+  -- checkerboard
+  -->
+<script id="ground-vs" type="not-js">
+    precision highp float;
+
+    attribute vec3 vpos;
+    varying vec3 outPos;
+    varying vec3 outColor;
+
+    uniform mat4 view;
+    uniform mat4 proj;
+    uniform mat4 model;
+    uniform vec3 color;
+
+
+    void main(void) {
+        gl_Position = proj * view * model * vec4(vpos, 1.0);
+        outPos = vpos;
+        outColor = color;
+    }
+</script>
+<script id="ground-fs" type="notjs">
+    // note this is used for more than just the cube
+    precision highp float;
+    varying vec3 outPos;
+    varying vec3 outColor;
+    void main(void) {
+        gl_FragColor = vec4(outColor, 1.0);
+
+    }
+</script>
+
+<script id="skybox-vs" type="not-js">
+    attribute vec3 vpos;
+    attribute vec2 vTexCoord;
+    varying vec2 fTexCoord;
+      
+    uniform mat4 view;
+    uniform mat4 proj;
+    uniform mat4 model;
+
+    void main(void) {
+        gl_Position = proj * view * model * vec4(vpos, 1.0);
+        fTexCoord = vTexCoord;
+    }
+</script>
+
+<script id="skybox-fs" type="not-js">
+      precision highp float;
+      varying vec2 fTexCoord;
+      uniform sampler2D texSampler;
+
+      void main(void) {
+         vec4 texColor = texture2D(texSampler,fTexCoord);
+         gl_FragColor = vec4(texColor.xyz,texColor.a);
+         //gl_FragColor = vec4(texColor.xyz,texColor.a);
+      }
+</script>
+
+<script type="not-js" id="refBox-vs">
+     uniform mat4 proj;
+     uniform mat4 view;
+     uniform mat4 model;
+     attribute vec3 vpos;
+     attribute vec3 vnormal;
+     varying vec3 v_eyeCoords;
+     varying vec3 v_normal;
+     varying vec3 fpos;
+     uniform vec3 lightdir;
+     varying vec3 flight;
+     void main() {
+        vec4 eyeCoords = view * model * vec4(vpos,1.0);
+        fpos = vpos;
+        flight = (view*model*vec4(100.*lightdir,1.)).xyz;
+        gl_Position = proj * eyeCoords;
+        v_eyeCoords = eyeCoords.xyz;
+        v_normal = normalize(vnormal);
+        v_normal = (normalize(view * model * vec4(v_normal,0))).xyz;
+     }
+</script>
+<script type="not-js" id="refBox-fs">
+     precision mediump float;
+     varying vec3 v_normal;
+     varying vec3 fpos;
+     varying vec3 v_eyeCoords;
+     uniform samplerCube skybox;
+     uniform mat4 inverseViewTransform;
+     varying vec3 flight;
+     void main() {
+
+
+        vec3 N = v_normal;
+        vec3 V = normalize(-v_eyeCoords);
+        vec3 R = -reflect(V,N);
+        vec3 T = normalize((inverseViewTransform * vec4(R,0)).xyz); // Transform by inverse of the view transform that was applied to the skybox
+        vec3 S = normalize(flight);
+        //vec3 F = normalize((inverseViewTransform * vec4(R,0)).xyz);
+        vec3 H = normalize(V+S);
+        //float diffuse = Ka + Kd * lightInt * max(0.0, dot(N, S));
+        float spec =  0.6 * pow(max(0.0, dot(N,H)),20.0);
+
+        vec4 sColor = vec4(spec, spec, spec, 0);
+        gl_FragColor = textureCube(skybox, T) + sColor;
+     }
+</script>
+
+</body>
+</html>
